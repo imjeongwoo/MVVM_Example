@@ -7,93 +7,44 @@
 
 import UIKit
 
-class ViewController: UIViewController {
-    // MARK: - Model
-    
-    struct UtcTimeModel: Codable {
-        let id: String
-        let currentDateTime: String
-        let utcOffset: String
-        let isDayLightSavingsTime: Bool
-        let dayOfTheWeek: String
-        let timeZoneName: String
-        let currentFileTime: Int
-        let ordinalDate: String
-        let serviceResponse: String?
+/*
+ View 입장에서는 View에 보여져야할 모든 데이터 형태가 ViewModel에 있기때문에 ViewModel만 바라본다!
+ 
+ View에서 Event가 발생했을 때 그 Event에 관한 적절한 처리도 ViewModel에게 요청한다
+ */
 
-        enum CodingKeys: String, CodingKey {
-            case id = "$id"
-            case currentDateTime
-            case utcOffset
-            case isDayLightSavingsTime
-            case dayOfTheWeek
-            case timeZoneName
-            case currentFileTime
-            case ordinalDate
-            case serviceResponse
-        }
-    }
-    
-    // MARK: - View
+class ViewController: UIViewController {
     
     @IBOutlet weak var datetimeLabel: UILabel!
     
     @IBAction func onYesterday() {
-        guard let yesterday = Calendar.current.date(byAdding: .day,
-                                                    value: -1,
-                                                    to: currentDateTime) else { return }
-        currentDateTime = yesterday
-        updateDateTime()
+        viewModel.moveDay(day: -1)
     }
     
     @IBAction func onNow() {
-        fetchNow()
+        datetimeLabel.text = "Loading.."
+        viewModel.reload()
     }
     
     @IBAction func onTomorrow() {
-        guard let tomorrow = Calendar.current.date(byAdding: .day,
-                                                   value: +1,
-                                                   to: currentDateTime) else { return }
-        currentDateTime = tomorrow
-        updateDateTime()
+        viewModel.moveDay(day: 1)
     }
     
-    // MARK: - Controller
+    let viewModel = ViewModel()
     override func viewDidLoad() {
         super.viewDidLoad()
-        fetchNow()
-    }
-    
-    var currentDateTime = Date()
-    
-    private func updateDateTime() {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyy년 MM월 dd일 HH시 mm분"
-        datetimeLabel.text = formatter.string(from: currentDateTime)
-    }
-    
-    private func fetchNow() {
-        let url = "http://worldclockapi.com/api/json/utc/now"
         
-        datetimeLabel.text = "Loading.."
-        
-        URLSession.shared.dataTask(with: URL(string: url)!) { [weak self] data, _, _ in
-            guard let data = data else { return }
-            guard let model = try? JSONDecoder().decode(UtcTimeModel.self, from: data) else { return }
-            
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyy-MM-dd'T'HH:mm'Z'"
-            
-            guard let now = formatter.date(from: model.currentDateTime) else { return }
-            
-            self?.currentDateTime = now
+        // 뷰 모델에 fetch 해오기
+        viewModel.onUpdated = { [weak self] in
+            guard let self = self else { return }
             
             DispatchQueue.main.async {
-                self?.updateDateTime()
+                self.datetimeLabel.text = self.viewModel.dateTimeString
             }
-        }.resume()
+        }
+        
+        viewModel.reload()
+        
+        // ViewModel이 View를 setting하는 부분
     }
-    
-
 }
-
